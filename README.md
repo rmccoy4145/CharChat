@@ -16,8 +16,8 @@ can be used to create a client-server architecture while also learning more abou
 ## How to Run
 
 - build the project using `mvn clean install`
-- in one terminal run the server using `java -jar target/CharChat-1.0-SNAPSHOT.jar server`
-- in another terminal run the client using `java -jar target/CharChat-1.0-SNAPSHOT.jar client`
+- in one terminal run the server using `java -jar target/CharChat-{version}.jar server`
+- in another terminal run the client using `java -jar target/CharChat-{version}.jar client`
   - in the client user input from the console will be sent to the server and all other clients
   - enter `.` in the client to disconnect from the server
 - Enjoy!
