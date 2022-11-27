@@ -12,14 +12,15 @@ import java.util.*;
 public class main
 {
 
-    static List<ChatMessage> chatRoom = Collections.synchronizedList(new ArrayList<>());
+    static List<ChatHandler> chatHandlers = new ArrayList<>();
+
 
     public static void main(String[] args) throws IOException
     {
 
         if (args.length < 1 || args[0].isEmpty())
         {
-            System.out.println("Usage: [server|client]");
+            System.out.println("Usage: [server|client|viewclient]");
             System.exit(1);
         }
 
@@ -47,7 +48,17 @@ public class main
         ServerSocket serverSocket = new ServerSocket(10888);
         while(true)
         {
-            new ChatSocket(serverSocket.accept()).start();
+            ChatHandler chatHandler = new ChatHandler(serverSocket.accept());
+            chatHandlers.add(chatHandler);
+            chatHandler.start();
+        }
+    }
+
+    public static void broadcastMessage(ChatMessage message)
+    {
+        for (ChatHandler handler : chatHandlers)
+        {
+            handler.sendMessage(message);
         }
     }
 
@@ -57,10 +68,10 @@ public class main
         Socket socket = new Socket("localhost", 10888);
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
         out.println("## connected ##");
-        String userInput;
         System.out.println(in.readLine());
+        InputHandler inputHandler = new InputHandler(out);
+        inputHandler.start();
         while(true)
         {
             if(!socket.isConnected())
@@ -73,21 +84,46 @@ public class main
             {
                 System.out.println(serverResponse);
             }
-            userInput = stdIn.readLine();
-            if (userInput != null)
+        }
+    }
+
+    static class InputHandler extends Thread
+    {
+        private BufferedReader in;
+        private PrintWriter out;
+
+        public InputHandler(PrintWriter out)
+        {
+            this.in = new BufferedReader(new InputStreamReader(System.in));
+            this.out = out;
+        }
+
+        @Override
+        public void run()
+        {
+            String userInput;
+            try
             {
-                out.println(userInput);
+                while ((userInput = in.readLine()) != null)
+                {
+                    out.println(userInput);
+                }
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
             }
         }
     }
 
-    static class ChatSocket extends Thread
+    static class ChatHandler extends Thread
     {
 
         UUID uuid = UUID.randomUUID();
         Socket socket;
+        PrintWriter out;
 
-        ChatSocket(Socket socket)
+        ChatHandler(Socket socket)
         {
             this.socket = socket;
         }
@@ -95,11 +131,12 @@ public class main
         @Override
         public void run()
         {
-            PrintWriter out = null;
+
             try
             {
                 out = new PrintWriter(socket.getOutputStream(), true);
                 out.println("Welcome to CharChat! Your UUID is " + uuid.toString());
+                System.out.println("Client connected: " + uuid.toString());
                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 String clientMessage;
                 while (true)
@@ -109,14 +146,11 @@ public class main
                         if (".".equals(clientMessage))
                         {
 
-                            chatRoom.add(new ChatMessage(getTimeStamp(), uuid.toString(), " Has disconnected!"));
-                            out.println("good bye");
-                            System.out.println(chatRoom.get(chatRoom.size() - 1));
+                            broadcastMessage(new ChatMessage(getTimeStamp(), uuid.toString(), " Has disconnected!"));
+                            System.out.println("Client disconnected: " + uuid.toString());
                             break;
                         }
-                        chatRoom.add(new ChatMessage(getTimeStamp(), uuid.toString(), clientMessage));
-                        out.println(chatRoom.toString());
-                        System.out.println(chatRoom.get(chatRoom.size() - 1));
+                        broadcastMessage(new ChatMessage(getTimeStamp(), uuid.toString(), clientMessage));
                     }
                 }
             } catch (IOException e)
@@ -127,6 +161,11 @@ public class main
         static String getTimeStamp()
         {
             return Instant.now().toString();
+        }
+
+        public void sendMessage(ChatMessage message)
+        {
+            out.println(message.toString());
         }
 
     }
